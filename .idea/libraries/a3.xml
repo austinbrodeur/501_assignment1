@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="a3">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/src/Client/a3.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
