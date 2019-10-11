@@ -64,8 +64,7 @@ public class FastFtp {
 				e.printStackTrace();
 			}
 			if (retry_count == 10) {
-				System.out.println("Could not retrieve UDP port from server after 10 attempts. Quitting.");
-				System.exit(1);
+				throw new RuntimeException();
 			}
 			retry_count += 1;
 		}

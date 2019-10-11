@@ -7,9 +7,9 @@ class FastFtpTest {
     private FastFtp fastFtp = new FastFtp(10, 10);
 
     @Test
-    void testGetServerUDP() {
+    void testGetServerUDPPass() {
         String serverName = "localhost";
-        String filePath = "C:\\Users\\austi\\Desktop\\a1\\src\\Client\\test.pdf"; // Change this to whatever file you wish to transfer
+        String filePath = "C:\\Users\\austi\\Desktop\\a1\\src\\Client\\test.pdf";
         int tcpPort = 2225;
         int result;
 
@@ -17,4 +17,15 @@ class FastFtpTest {
         assertNotEquals(-1, result);
     }
 
+    @Test
+    void testGetServerUDPbadPort() {
+        String serverName = "localhost";
+        String filePath = "C:\\Users\\austi\\Desktop\\a1\\src\\Client\\test.pdf";
+        int tcpPort = 2222;
+
+        assertThrows(RuntimeException.class, () -> {
+            fastFtp.getServerUDP(serverName, tcpPort, filePath);
+        });
+    }
+    
 }

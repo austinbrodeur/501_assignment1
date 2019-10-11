@@ -9,8 +9,10 @@ There are two portions of the assignment that I was not required to write, as th
 
 The remaining code in the client directory was written by me, and was refactored by me.
 
+I tried to not make any significant changes to any of the code dealing with threads, as I know it can get messy trying to understand how they work. Most of my refactorings had to do with simpler, easy to follow functionality.
+
 ## To Compile and Run
-This code requires the a3.jar file in the Client directory as a depencency, as well as all of the files in the lib directory, so these must be added to the classpath to run and compile. I created this project in Intellij, so if Intellij is used, you can simply open the project file and all of the required classpaths and arguments to run should be there.
+This code requires the a3.jar file in the Client directory as a depencency, as well as all of the files in the lib directory, so these must be added to the classpath to run and compile. I created this project in Intellij, so if Intellij is used, you can simply open the project file and everything should be configured for you.
 
 Before running the client code, go into the server directory and execute the *server.sh* shell script to open an instance of a local server. This file can be edited to change the probability of packet loss.
 
