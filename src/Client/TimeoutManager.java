@@ -16,17 +16,17 @@ public class TimeoutManager implements Runnable
 	private TxQueue transmitQueue;
 	private DatagramSocket socket;
 	private String serverName;
-	private int serverUdpPort;
-	private int timeoutTime;
+	private Integer serverUdpPort;
+	private Integer timeoutTime;
 	private Segment currentSegment = null;
 	private Timer timer;
-	private int[] retransmitCount;
+	private Integer[] retransmitCount;
 
 
 	/**
 	  * Constructor
 	**/
-	public TimeoutManager(TxQueue q, DatagramSocket s, String address, int port, int tO, Timer t, int[] count)
+	public TimeoutManager(TxQueue q, DatagramSocket s, String address, Integer port, Integer tO, Timer t, Integer[] count)
 	{
 		transmitQueue = q;
 		socket = s;

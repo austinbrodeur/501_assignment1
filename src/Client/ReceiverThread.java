@@ -13,13 +13,13 @@ public class ReceiverThread extends Thread {
 
 	private DatagramSocket socket;
 	private TxQueue transmitQueue;
-	private int serverUdpPort;
-	private int lastSegment;
+	private Integer serverUdpPort;
+	private Integer lastSegment;
 	private String serverName;
 	private Thread timeoutManager;
 	private volatile boolean stop = false;
 
-	public ReceiverThread(DatagramSocket s, TxQueue queue, int lchunk, String name, int port)
+	public ReceiverThread(DatagramSocket s, TxQueue queue, Integer lchunk, String name, Integer port)
 	{
 		socket = s; // Uses UDP socket from main class
 		transmitQueue = queue; // Queue address from main class
@@ -37,10 +37,10 @@ public class ReceiverThread extends Thread {
 
 		try {
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-			while (stop == false) {
+			while (!stop) {
 				socket.receive(receivePacket);
 				Segment ackSeg = new Segment(receiveData);
-				int ackNum = ackSeg.getSeqNum();
+				Integer ackNum = ackSeg.getSeqNum();
 				deQueue(ackNum);
 			}
 		}
@@ -57,10 +57,10 @@ public class ReceiverThread extends Thread {
 	  *
 	  * @param seqnum 	The sequence number of the ACK received
 	**/
-	public synchronized void deQueue(int seqnum) throws InterruptedException
+	public synchronized void deQueue(Integer seqnum) throws InterruptedException
 	{
 		if (transmitQueue.element() != null) {
-			int end = seqnum - 1;
+			Integer end = seqnum - 1;
 			if (transmitQueue.element().getSeqNum() == end) {
 				transmitQueue.remove();
 			}

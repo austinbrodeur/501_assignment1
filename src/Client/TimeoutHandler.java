@@ -15,13 +15,13 @@ public class TimeoutHandler extends TimerTask
 	private TxQueue transmitQueue;
 	private DatagramSocket socket;
 	private String serverName;
-	private int serverUdpPort;
-	private int[] retransmitCount;
+	private Integer serverUdpPort;
+	private Integer[] retransmitCount;
 
 	/**
 	  * Constructor
 	**/
-	public TimeoutHandler(TxQueue q, DatagramSocket s, String address, int port, int[] count)
+	public TimeoutHandler(TxQueue q, DatagramSocket s, String address, Integer port, Integer[] count)
 	{
 		transmitQueue = q;
 		socket = s;

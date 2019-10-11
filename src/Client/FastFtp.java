@@ -18,10 +18,10 @@ public class FastFtp {
 	private DatagramSocket udpSocket;
 	private ReceiverThread receiverThread;
 	private Thread timeoutManager;
-	private int windowSize;
-	private int nextSequence = 0;
-	private int timeoutTime;
-	private int[] retransmitCount = new int[1];
+	private Integer windowSize;
+	private Integer nextSequence = 0;
+	private Integer timeoutTime;
+	private Integer[] retransmitCount = new Integer[1];
 	private TxQueue transmitQueue;
 	private Timer timer = new Timer(true);
 
@@ -31,7 +31,7 @@ public class FastFtp {
      * @param windowSize	Size of the window for Go-Back-N in terms of segments
      * @param rtoTimer		The time-out interval for the retransmission timer
      */
-	public FastFtp(int wSize, int rtoTimer) {
+	public FastFtp(Integer wSize, Integer rtoTimer) {
 		windowSize = wSize;
 		timeoutTime = rtoTimer;
 		transmitQueue = new TxQueue(windowSize);
@@ -45,9 +45,9 @@ public class FastFtp {
 	 * @param fileName		Path of file to be transferred
 	 * @return				UDP port of the server retrieved by the handshake
 	 */
-	public int getServerUDP(String serverName, int serverTCPPort, String fileName) {
-		int serverUDPPort = -1;
-		int retry_count = 1;
+	public int getServerUDP(String serverName, Integer serverTCPPort, String fileName) {
+		Integer serverUDPPort = -1;
+		Integer retry_count = 1;
 		while (serverUDPPort == -1) {
 			try {
 				System.out.println("Trying to obtain UDP port from server... Attempt " + retry_count);
@@ -78,7 +78,7 @@ public class FastFtp {
 	 * @param serverUDPPort	Server UDP port from handshake
 	 * @param fileChunks	2D byte array of file after being divided into chunks
 	 */
-	public void initializeThreads(String serverName, int serverUDPPort, byte[][] fileChunks) {
+	public void initializeThreads(String serverName, Integer serverUDPPort, byte[][] fileChunks) {
 		timeoutManager = new Thread(new TimeoutManager(transmitQueue, udpSocket, serverName, serverUDPPort, timeoutTime, timer, retransmitCount));
 		timeoutManager.start();
 
@@ -121,8 +121,8 @@ public class FastFtp {
      * @param serverPort	Port number of the remote server
      * @param fileName		Name of the file to be trasferred to the remote server
      */
-	public void send(String serverName, int serverPort, String fileName) {
-		int serverUdpPort;
+	public void send(String serverName, Integer serverPort, String fileName) {
+		Integer serverUdpPort;
 		byte[][] fileChunks;
 		retransmitCount[0] = 0;
 
@@ -134,8 +134,8 @@ public class FastFtp {
 			serverUdpPort = getServerUDP(serverName, serverPort, fileName);
 			initializeThreads(serverName, serverUdpPort, fileChunks);
 
-			for (int i = 0; i < fileChunks.length; i++) {
-				addToQueue(fileChunks[i], serverName, serverUdpPort);
+			for (byte[] fileChunk : fileChunks) {
+				addToQueue(fileChunk, serverName, serverUdpPort);
 				reTransmit(serverName, serverUdpPort);
 			}
 			while (true) {
@@ -160,12 +160,12 @@ public class FastFtp {
 	  * @param fname 	Name of file to be sent
 	  * @return sPort 	Port for the UDP connection of the server. If this is -1 after the method is finished running, there was an error.
 	**/
-	public int openTCP(String sname, int port, String fname)
+	public Integer openTCP(String sname, Integer port, String fname)
 	{
 		DataInputStream dataIn = null;
 		DataOutputStream dataOut = null;
 		File file;
-		int udpPort = -1;
+		Integer udpPort = -1;
 
 		try {
 			tcpConnection = new Socket(sname, port);
@@ -238,11 +238,11 @@ public class FastFtp {
 	**/
 	public byte[][] splitFile(byte[] fullPayload)
 	{
-		int CHUNK_SIZE = 1000;
+		Integer CHUNK_SIZE = 1000;
 
 		byte[][] ret = new byte[(int)Math.ceil(fullPayload.length / (double)CHUNK_SIZE)][];
-		int start = 0;
-		for (int i = 0; i < ret.length; i++) {
+		Integer start = 0;
+		for (Integer i = 0; i < ret.length; i++) {
 			if (start + CHUNK_SIZE > fullPayload.length) {
 				ret[i] = new byte[fullPayload.length-start];
 				System.arraycopy(fullPayload, start, ret[i], 0, fullPayload.length - start);
@@ -266,7 +266,7 @@ public class FastFtp {
 	  * @param sPort 	UDP port of the server
 	  * @return boolean	Returns true if the segment was able to be added to the queue, false if the queue is full
 	**/
-	public synchronized void addToQueue(byte[] chunk, String serverName, int sPort)
+	public synchronized void addToQueue(byte[] chunk, String serverName, Integer sPort)
 	{
 		try {
 			Segment segmentSend = new Segment(nextSequence, chunk);
@@ -287,7 +287,7 @@ public class FastFtp {
 	  * @param serverName	Address of the server
 	  * @param udpPort 	UDP port of the server
 	**/
-	public void reTransmit(String serverName, int udpPort)
+	public void reTransmit(String serverName, Integer udpPort)
 	{
 		while (!transmitQueue.isEmpty()) {
 			try {
@@ -323,10 +323,10 @@ public class FastFtp {
 		// parse the command line arguments
 		// assume no errors
 		String serverName = args[0];
-		int serverPort = Integer.parseInt(args[1]);
+		Integer serverPort = Integer.parseInt(args[1]);
 		String fileName = args[2];
-		int windowSize = Integer.parseInt(args[3]);
-		int timeout = Integer.parseInt(args[4]);
+		Integer windowSize = Integer.parseInt(args[3]);
+		Integer timeout = Integer.parseInt(args[4]);
 
 		// send the file to server
 		FastFtp ftp = new FastFtp(windowSize, timeout);
