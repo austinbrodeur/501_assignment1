@@ -28,7 +28,7 @@ public class FastFtp {
 	/**
      * Constructor to initialize the program 
      * 
-     * @param windowSize	Size of the window for Go-Back_N in terms of segments
+     * @param windowSize	Size of the window for Go-Back-N in terms of segments
      * @param rtoTimer		The time-out interval for the retransmission timer
      */
 	public FastFtp(int windowSize, int rtoTimer) {
@@ -36,7 +36,79 @@ public class FastFtp {
 		toTime = rtoTimer;
 		tQueue = new TxQueue(windowSize);
 	}
-	
+
+	/**
+	 * Attempts to get the UDP port from the server. Will quit after 10 tries.
+	 *
+	 * @param serverName	Server address or name
+	 * @param serverTCPPort	Server TCP port for handshake
+	 * @param fileName		Path of file to be transferred
+	 * @return				UDP port of the server retrieved by the handshake
+	 */
+	public int getServerUDP(String serverName, int serverTCPPort, String fileName) {
+		int serverUDPPort = -1;
+		int retry_count = 1;
+		while (serverUDPPort == -1) {
+			try {
+				System.out.println("Trying to obtain UDP port from server... Attempt " + retry_count);
+
+				createSendUdp();
+
+				serverUDPPort = openTCP(serverName, serverTCPPort, fileName);
+				if (serverUDPPort == -1) {
+					throw new Exception("UDP port could not be received from the server");
+				}
+				System.out.println("Server UDP port received: " + serverUDPPort);
+			} catch (Exception e) {
+				System.out.println("Error getting UDP port from server: ");
+				e.printStackTrace();
+			}
+			if (retry_count == 10) {
+				System.out.println("Could not retrieve UDP port from server after 10 attempts. Quitting.");
+				System.exit(1);
+			}
+			retry_count += 1;
+		}
+		return serverUDPPort;
+	}
+
+	/**
+	 * Initializes the threads required for the send method
+	 *
+	 * @param serverName	Server address or name
+	 * @param serverUDPPort	Server UDP port from handshake
+	 * @param fileChunks	2D byte array of file after being divided into chunks
+	 */
+	public void initializeThreads(String serverName, int serverUDPPort, byte[][] fileChunks) {
+		toM = new Thread(new TimeoutManager(tQueue, UdpSocket, serverName, serverUDPPort, toTime, timer, rtCount));
+		toM.start();
+
+		receiver = new ReceiverThread(UdpSocket, tQueue, fileChunks.length, serverName, serverUDPPort);
+		receiver.start();
+	}
+
+
+	/**
+	 * Cleans up threads and generates report after file is transferred
+	 */
+	public void teardownSend() {
+		try {
+			System.out.println("Number of retransmits: " + rtCount[0]);
+			System.out.println("Closing ports and stopping client..");
+			receiver.requestStop();
+			Thread.sleep(500);
+			timer.cancel();
+			toM.interrupt();
+			TcpCon.close();
+		}
+		catch (Exception e) {
+			System.out.println("Error tearing down: ");
+			e.printStackTrace();
+		}
+	}
+
+
+
 
     /**
      * Sends the specified file to the specified destination host:
@@ -54,20 +126,14 @@ public class FastFtp {
 		int SUDPport;
 		byte[][] fileChunks;
 		rtCount[0] = 0;
-		try {
-			createSendUdp();
 
-			SUDPport = openTCP(serverName, serverPort, fileName);
-			if (SUDPport == -1) {
-				throw new Exception ("Server UDP port number was not received from the server");
-			}
-			System.out.println("Server UDP port received: " + SUDPport);
+		try {
 			fileChunks = splitFile(filetoBytes(fileName));
-			toM = new Thread(new TimeoutManager(tQueue, UdpSocket, serverName, SUDPport, toTime, timer, rtCount));
-			toM.start();
-			receiver = new ReceiverThread(UdpSocket, tQueue, fileChunks.length, serverName, SUDPport);
-			receiver.start();
 			System.out.println("Number of chunks: " + fileChunks.length);
+
+			createSendUdp();
+			SUDPport = getServerUDP(serverName, serverPort, fileName);
+			initializeThreads(serverName, SUDPport, serverPort, fileName, fileChunks);
 
 			for (int i = 0; i < fileChunks.length; i++) {
 				addtoQueue(fileChunks[i], serverName, SUDPport);
@@ -75,13 +141,7 @@ public class FastFtp {
 			}
 			while (true) {
 				if (tQueue.isEmpty()) {
-					System.out.println("Number of retransmits: " + rtCount[0]);
-					System.out.println("Closing ports and stopping client..");
-					receiver.requestStop();
-					Thread.sleep(500); // This was required to ensure the port doesn't close before other threads are done using it
-					timer.cancel();
-					toM.interrupt();
-					TcpCon.close();
+					teardownSend();
 					return;
 				}
 			}
@@ -157,6 +217,7 @@ public class FastFtp {
 	**/
 	public byte[] filetoBytes(String fpath)
 	{
+		System.out.println("Working Directory = " + System.getProperty("user.dir"));
 		Path file = Paths.get(fpath);
 		byte[] res = null;
 		try {
@@ -255,7 +316,7 @@ public class FastFtp {
      * 
      */
 	public static void main(String[] args) {
-		// all srguments should be provided
+		// all arguments should be provided
 		// as described in the assignment description 
 		if (args.length != 5) {
 			System.out.println("incorrect usage, try again.");
@@ -275,6 +336,7 @@ public class FastFtp {
 		FastFtp ftp = new FastFtp(windowSize, timeout);
 		System.out.printf("sending file \'%s\' to server...\n", fileName);
 		ftp.send(serverName, serverPort, fileName);
-		System.out.println("file transfer completed.");
+		System.out.println("File transfer completed.");
+		System.exit(0);
 	}
 }
