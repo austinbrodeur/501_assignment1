@@ -12,20 +12,20 @@ import cpsc441.a3.shared.*;
 public class ReceiverThread extends Thread {
 
 	private DatagramSocket socket;
-	private TxQueue rectQueue;
-	private int sPort;
-	private int lastSeg;
-	private String sName;
-	private Thread toM;
+	private TxQueue transmitQueue;
+	private int serverUdpPort;
+	private int lastSegment;
+	private String serverName;
+	private Thread timeoutManager;
 	private volatile boolean stop = false;
 
 	public ReceiverThread(DatagramSocket s, TxQueue queue, int lchunk, String name, int port)
 	{
 		socket = s; // Uses UDP socket from main class
-		rectQueue = queue; // Queue address from main class
-		lastSeg = lchunk;
-		sName = name;
-		sPort = port;
+		transmitQueue = queue; // Queue address from main class
+		lastSegment = lchunk;
+		serverName = name;
+		serverUdpPort = port;
 	}
 
 	/**
@@ -39,10 +39,9 @@ public class ReceiverThread extends Thread {
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 			while (stop == false) {
 				socket.receive(receivePacket);
-				Segment ackseg = new Segment(receiveData);
-				int acknum = ackseg.getSeqNum();
-				//System.out.println("ACK " + acknum + " received");
-				deQueue(acknum);
+				Segment ackSeg = new Segment(receiveData);
+				int ackNum = ackSeg.getSeqNum();
+				deQueue(ackNum);
 			}
 		}
 		catch (Exception e) {
@@ -60,18 +59,16 @@ public class ReceiverThread extends Thread {
 	**/
 	public synchronized void deQueue(int seqnum) throws InterruptedException
 	{
-		if (rectQueue.element() != null) {
+		if (transmitQueue.element() != null) {
 			int end = seqnum - 1;
-			int first = rectQueue.element().getSeqNum();
-			if (rectQueue.element().getSeqNum() == end) {
-				rectQueue.remove();
+			if (transmitQueue.element().getSeqNum() == end) {
+				transmitQueue.remove();
 			}
 			else {
-				for (int f = rectQueue.element().getSeqNum(); f <= end; f++) {
-					rectQueue.remove();
+				for (int f = transmitQueue.element().getSeqNum(); f <= end; f++) {
+					transmitQueue.remove();
 				}
 			}
-			//System.out.println("Queue size: " + rectQueue.size());
 		}
 	}
 

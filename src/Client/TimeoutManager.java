@@ -13,14 +13,14 @@ import java.util.TimerTask;
 
 public class TimeoutManager implements Runnable
 {
-	private TxQueue rectQueue;
+	private TxQueue transmitQueue;
 	private DatagramSocket socket;
-	private String sName;
-	private int sPort;
-	private int toTime;
-	private Segment cSeg = null;
+	private String serverName;
+	private int serverUdpPort;
+	private int timeoutTime;
+	private Segment currentSegment = null;
 	private Timer timer;
-	private int[] rtCount;
+	private int[] retransmitCount;
 
 
 	/**
@@ -28,13 +28,13 @@ public class TimeoutManager implements Runnable
 	**/
 	public TimeoutManager(TxQueue q, DatagramSocket s, String address, int port, int tO, Timer t, int[] count)
 	{
-		rectQueue = q;
+		transmitQueue = q;
 		socket = s;
-		sName = address;
-		sPort = port;
-		toTime = tO;
+		serverName = address;
+		serverUdpPort = port;
+		timeoutTime = tO;
 		timer = t;
-		rtCount = count;
+		retransmitCount = count;
 	}
 
 	/**
@@ -52,12 +52,11 @@ public class TimeoutManager implements Runnable
 	{
 		while(true)
 		{
-			if ((cSeg == null) && (rectQueue.size() != 0) || (cSeg != rectQueue.element() && rectQueue.element() != null)) {
-				cSeg = rectQueue.element();
+			if ((currentSegment == null) && (transmitQueue.size() != 0) || (currentSegment != transmitQueue.element() && transmitQueue.element() != null)) {
+				currentSegment = transmitQueue.element();
 				timer.cancel();
 				timer = new Timer(true);
-				timer.schedule(new TimeoutHandler(rectQueue, socket, sName, sPort, rtCount), toTime);
-				//System.out.println("Timeout started");
+				timer.schedule(new TimeoutHandler(transmitQueue, socket, serverName, serverUdpPort, retransmitCount), timeoutTime);
 			}
 		}
 	}

@@ -14,15 +14,15 @@ import cpsc441.a3.shared.*;
 
 public class FastFtp {
 
-	private Socket TcpCon;
-	private DatagramSocket UdpSocket;
-	private ReceiverThread receiver;
-	private Thread toM;
-	private int wSize;
-	private int nextSeq = 0;
-	private int toTime;
-	private int[] rtCount = new int[1];
-	private TxQueue tQueue;
+	private Socket tcpConnection;
+	private DatagramSocket udpSocket;
+	private ReceiverThread receiverThread;
+	private Thread timeoutManager;
+	private int windowSize;
+	private int nextSequence = 0;
+	private int timeoutTime;
+	private int[] retransmitCount = new int[1];
+	private TxQueue transmitQueue;
 	private Timer timer = new Timer(true);
 
 	/**
@@ -31,10 +31,10 @@ public class FastFtp {
      * @param windowSize	Size of the window for Go-Back-N in terms of segments
      * @param rtoTimer		The time-out interval for the retransmission timer
      */
-	public FastFtp(int windowSize, int rtoTimer) {
-		wSize = windowSize;
-		toTime = rtoTimer;
-		tQueue = new TxQueue(windowSize);
+	public FastFtp(int wSize, int rtoTimer) {
+		windowSize = wSize;
+		timeoutTime = rtoTimer;
+		transmitQueue = new TxQueue(windowSize);
 	}
 
 	/**
@@ -79,11 +79,11 @@ public class FastFtp {
 	 * @param fileChunks	2D byte array of file after being divided into chunks
 	 */
 	public void initializeThreads(String serverName, int serverUDPPort, byte[][] fileChunks) {
-		toM = new Thread(new TimeoutManager(tQueue, UdpSocket, serverName, serverUDPPort, toTime, timer, rtCount));
-		toM.start();
+		timeoutManager = new Thread(new TimeoutManager(transmitQueue, udpSocket, serverName, serverUDPPort, timeoutTime, timer, retransmitCount));
+		timeoutManager.start();
 
-		receiver = new ReceiverThread(UdpSocket, tQueue, fileChunks.length, serverName, serverUDPPort);
-		receiver.start();
+		receiverThread = new ReceiverThread(udpSocket, transmitQueue, fileChunks.length, serverName, serverUDPPort);
+		receiverThread.start();
 	}
 
 
@@ -92,13 +92,13 @@ public class FastFtp {
 	 */
 	public void teardownSend() {
 		try {
-			System.out.println("Number of retransmits: " + rtCount[0]);
+			System.out.println("Number of retransmits: " + retransmitCount[0]);
 			System.out.println("Closing ports and stopping client..");
-			receiver.requestStop();
+			receiverThread.requestStop();
 			Thread.sleep(500);
 			timer.cancel();
-			toM.interrupt();
-			TcpCon.close();
+			timeoutManager.interrupt();
+			tcpConnection.close();
 		}
 		catch (Exception e) {
 			System.out.println("Error tearing down: ");
@@ -122,24 +122,24 @@ public class FastFtp {
      * @param fileName		Name of the file to be trasferred to the remote server
      */
 	public void send(String serverName, int serverPort, String fileName) {
-		int SUDPport;
+		int serverUdpPort;
 		byte[][] fileChunks;
-		rtCount[0] = 0;
+		retransmitCount[0] = 0;
 
 		try {
 			fileChunks = splitFile(filetoBytes(fileName));
 			System.out.println("Number of chunks: " + fileChunks.length);
 
 			createSendUdp();
-			SUDPport = getServerUDP(serverName, serverPort, fileName);
-			initializeThreads(serverName, SUDPport, fileChunks);
+			serverUdpPort = getServerUDP(serverName, serverPort, fileName);
+			initializeThreads(serverName, serverUdpPort, fileChunks);
 
 			for (int i = 0; i < fileChunks.length; i++) {
-				addtoQueue(fileChunks[i], serverName, SUDPport);
-				reTransmit(serverName, SUDPport);
+				addToQueue(fileChunks[i], serverName, serverUdpPort);
+				reTransmit(serverName, serverUdpPort);
 			}
 			while (true) {
-				if (tQueue.isEmpty()) {
+				if (transmitQueue.isEmpty()) {
 					teardownSend();
 					return;
 				}
@@ -162,16 +162,16 @@ public class FastFtp {
 	**/
 	public int openTCP(String sname, int port, String fname)
 	{
-		DataInputStream dIn = null;
-		DataOutputStream dOut = null;
+		DataInputStream dataIn = null;
+		DataOutputStream dataOut = null;
 		File file;
-		int sPort = -1;
+		int udpPort = -1;
 
 		try {
-			TcpCon = new Socket(sname, port);
+			tcpConnection = new Socket(sname, port);
 
-			dIn = new DataInputStream(TcpCon.getInputStream());
-			dOut = new DataOutputStream(TcpCon.getOutputStream());
+			dataIn = new DataInputStream(tcpConnection.getInputStream());
+			dataOut = new DataOutputStream(tcpConnection.getOutputStream());
 		}
 		catch (IOException e) {
 			System.out.println("Error creating initial TCP connection: " + e);
@@ -180,16 +180,16 @@ public class FastFtp {
 		try {
 			file = new File(fname);
 
-			dOut.writeUTF(fname);
-			dOut.writeLong(file.length());
-			dOut.writeInt(UdpSocket.getLocalPort()); //Port for the UDP connection of the client
-			dOut.flush();
-			sPort = dIn.readInt(); 
+			dataOut.writeUTF(fname);
+			dataOut.writeLong(file.length());
+			dataOut.writeInt(udpSocket.getLocalPort()); //Port for the UDP connection of the client
+			dataOut.flush();
+			udpPort = dataIn.readInt();
 		}
 		catch (Exception e) {
 			System.out.println("Error in TCP handshake: " + e);
 		}
-		return sPort;
+		return udpPort;
 	}
 
 
@@ -199,7 +199,7 @@ public class FastFtp {
 	public void createSendUdp()
 	{
 		try {
-			UdpSocket = new DatagramSocket();
+			udpSocket = new DatagramSocket();
 		}
 		catch(IOException e) {
 			System.out.println("Error opening DatagramSocket: " + e);
@@ -216,7 +216,6 @@ public class FastFtp {
 	**/
 	public byte[] filetoBytes(String fpath)
 	{
-		System.out.println("Working Directory = " + System.getProperty("user.dir"));
 		Path file = Paths.get(fpath);
 		byte[] res = null;
 		try {
@@ -267,20 +266,18 @@ public class FastFtp {
 	  * @param sPort 	UDP port of the server
 	  * @return boolean	Returns true if the segment was able to be added to the queue, false if the queue is full
 	**/
-	public synchronized void addtoQueue(byte[] chunk, String serverName, int sPort)
+	public synchronized void addToQueue(byte[] chunk, String serverName, int sPort)
 	{
 		try {
-			Segment segmentsend = new Segment(nextSeq, chunk);
-			//System.out.println("Sending " + segmentsend.getBytes().length + " bytes of data to " + InetAddress.getByName(serverName).toString() + ":" + sPort + " with seqnum " + segmentsend.getSeqNum());
-			DatagramPacket sendPacket = new DatagramPacket(segmentsend.getBytes(), segmentsend.getBytes().length, InetAddress.getByName(serverName), sPort);
-			UdpSocket.send(sendPacket);
-			tQueue.add(segmentsend);
+			Segment segmentSend = new Segment(nextSequence, chunk);
+			DatagramPacket sendPacket = new DatagramPacket(segmentSend.getBytes(), segmentSend.getBytes().length, InetAddress.getByName(serverName), sPort);
+			udpSocket.send(sendPacket);
+			transmitQueue.add(segmentSend);
 		}
 		catch (Exception e) {
 			System.out.println("Error adding chunk to queue: " + e);
 		}
-		//System.out.println("Queue size: " + tQueue.size());
-		nextSeq += 1;
+		nextSequence += 1;
 	}
 
 
@@ -288,18 +285,18 @@ public class FastFtp {
 	  * Retransmits the queue if there is no difference in the queue after the timeout delay.
 	  *
 	  * @param serverName	Address of the server
-	  * @param sPort 	UDP port of the server
+	  * @param udpPort 	UDP port of the server
 	**/
-	public void reTransmit(String serverName, int sPort)
+	public void reTransmit(String serverName, int udpPort)
 	{
-		while (!tQueue.isEmpty()) {
+		while (!transmitQueue.isEmpty()) {
 			try {
-				Segment[] temp = tQueue.toArray();
-				Thread.sleep(toTime);
-				if (!temp.equals(tQueue.toArray())) {
+				Segment[] temp = transmitQueue.toArray();
+				Thread.sleep(timeoutTime);
+				if (!temp.equals(transmitQueue.toArray())) {
 					timer.cancel();
 					timer = new Timer(true);
-					timer.schedule(new TimeoutHandler(tQueue, UdpSocket, serverName, sPort, rtCount), toTime);
+					timer.schedule(new TimeoutHandler(transmitQueue, udpSocket, serverName, udpPort, retransmitCount), timeoutTime);
 				}
 			}
 			catch (InterruptedException e) {

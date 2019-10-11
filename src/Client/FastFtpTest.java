@@ -27,5 +27,5 @@ class FastFtpTest {
             fastFtp.getServerUDP(serverName, tcpPort, filePath);
         });
     }
-    
+
 }
