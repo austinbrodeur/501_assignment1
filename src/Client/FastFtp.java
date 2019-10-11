@@ -10,6 +10,7 @@ import java.net.*;
 import java.util.*;
 import java.io.*;
 import java.nio.file.*;
+import java.util.regex.Pattern;
 import cpsc441.a3.shared.*;
 
 public class FastFtp {
@@ -28,6 +29,7 @@ public class FastFtp {
 	private TxQueue transmitQueue;
 	private Timer timer = new Timer(true);
 
+
 	/**
      * Constructor to initialize the program 
      * 
@@ -39,6 +41,7 @@ public class FastFtp {
 		timeoutTime = rtoTimer;
 		transmitQueue = new TxQueue(windowSize);
 	}
+
 
 	/**
 	 * Attempts to get the UDP port from the server. Will quit after 10 tries.
@@ -74,6 +77,7 @@ public class FastFtp {
 		return serverUDPPort;
 	}
 
+
 	/**
 	 * Initializes the threads required for the send method
 	 *
@@ -108,8 +112,6 @@ public class FastFtp {
 			e.printStackTrace();
 		}
 	}
-
-
 
 
     /**
@@ -153,7 +155,7 @@ public class FastFtp {
 			System.exit(1);
 		}
 	}
-	
+
 
 	/**
 	  * Opens TCP connection with the server and does the initial handshake. Returns UDP port.
@@ -161,7 +163,7 @@ public class FastFtp {
 	  * @param sname 	Server name
 	  * @param port 	Port for the server
 	  * @param fname 	Name of file to be sent
-	  * @return sPort 	Port for the UDP connection of the server. If this is -1 after the method is finished running, there was an error.
+	  * @return Integer Port for the UDP connection of the server. If this is -1 after the method is finished running, there was an error.
 	**/
 	public Integer openTCP(String sname, Integer port, String fname)
 	{
@@ -210,7 +212,6 @@ public class FastFtp {
 	}
 
 
-
 	/**
 	  * Converts file into an array of bytes
 	  *
@@ -229,7 +230,6 @@ public class FastFtp {
 		}
 		return res;
 	}
-
 
 
 	/**
@@ -256,7 +256,6 @@ public class FastFtp {
 		}
 		return ret;
 	}
-
 
 
 	/**
@@ -306,33 +305,49 @@ public class FastFtp {
 	}
 
 
-	
-    /**
-     * A simple test driver
-     * 
-     */
-	public static void main(String[] args) {
-		// all arguments should be provided
-		// as described in the assignment description 
+	//************************************ Below methods are for main method only ************************************
+
+
+	/**
+	 * Checks if there is an appropriate number of command line args. Raises runtime error if there isn't.
+	 *
+	 * @param args List of command line arguments
+	 */
+	public static void checkArgs(String[] args) {
 		if (args.length != 5) {
-			System.out.println("incorrect usage, try again.");
-			System.out.println("usage: FastFtp server port file window timeout");
-			System.exit(1);
+			System.out.println("Incorrect usage, try again.");
+			System.out.println("Usage: FastFtp <server address> <server port> <path of file to transfer> <file window size> <timeout time>");
+			throw new RuntimeException();
 		}
-		
-		// parse the command line arguments
-		// assume no errors
+	}
+
+
+	/**
+	 * Uses commandline args to instantiate FastFtp to call send
+	 *
+	 * @param args List of command line arguments
+	 */
+	public static void sendToServer(String[] args) {
 		String serverName = args[0];
 		Integer serverPort = Integer.parseInt(args[1]);
 		String fileName = args[2];
 		Integer windowSize = Integer.parseInt(args[3]);
 		Integer timeout = Integer.parseInt(args[4]);
 
-		// send the file to server
 		FastFtp ftp = new FastFtp(windowSize, timeout);
-		System.out.printf("sending file \'%s\' to server...\n", fileName);
+		System.out.printf("Sending file \'%s\' to server...\n", fileName);
 		ftp.send(serverName, serverPort, fileName);
 		System.out.println("File transfer completed.");
 		System.exit(0);
+	}
+
+
+	/**
+	 *
+	 * @param args Command line args
+	 */
+	public static void main(String[] args) {
+		checkArgs(args);
+		sendToServer(args);
 	}
 }
