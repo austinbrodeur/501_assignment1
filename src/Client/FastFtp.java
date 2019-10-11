@@ -133,7 +133,7 @@ public class FastFtp {
 
 			createSendUdp();
 			SUDPport = getServerUDP(serverName, serverPort, fileName);
-			initializeThreads(serverName, SUDPport, serverPort, fileName, fileChunks);
+			initializeThreads(serverName, SUDPport, fileChunks);
 
 			for (int i = 0; i < fileChunks.length; i++) {
 				addtoQueue(fileChunks[i], serverName, SUDPport);
