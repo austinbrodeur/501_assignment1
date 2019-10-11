@@ -33,7 +33,8 @@ public class ReceiverThread extends Thread {
 	**/
 	public void run()
 	{
-		byte[] receiveData = new byte[1000]; // Max size of segment payload
+		int MAX_SEGMENT_SIZE = 1000;
+		byte[] receiveData = new byte[MAX_SEGMENT_SIZE];
 
 		try {
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);

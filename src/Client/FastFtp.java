@@ -14,6 +14,9 @@ import cpsc441.a3.shared.*;
 
 public class FastFtp {
 
+	private final int MAX_SEGMENT_SIZE = 1000;
+	private final int THREAD_KILL_DELAY = 500;
+
 	private Socket tcpConnection;
 	private DatagramSocket udpSocket;
 	private ReceiverThread receiverThread;
@@ -95,7 +98,7 @@ public class FastFtp {
 			System.out.println("Number of retransmits: " + retransmitCount[0]);
 			System.out.println("Closing ports and stopping client..");
 			receiverThread.requestStop();
-			Thread.sleep(500);
+			Thread.sleep(THREAD_KILL_DELAY);
 			timer.cancel();
 			timeoutManager.interrupt();
 			tcpConnection.close();
@@ -238,20 +241,18 @@ public class FastFtp {
 	**/
 	public byte[][] splitFile(byte[] fullPayload)
 	{
-		Integer CHUNK_SIZE = 1000;
-
-		byte[][] ret = new byte[(int)Math.ceil(fullPayload.length / (double)CHUNK_SIZE)][];
+		byte[][] ret = new byte[(int)Math.ceil(fullPayload.length / (double)MAX_SEGMENT_SIZE)][];
 		Integer start = 0;
-		for (Integer i = 0; i < ret.length; i++) {
-			if (start + CHUNK_SIZE > fullPayload.length) {
+		for (int i = 0; i < ret.length; i++) {
+			if (start + MAX_SEGMENT_SIZE > fullPayload.length) {
 				ret[i] = new byte[fullPayload.length-start];
 				System.arraycopy(fullPayload, start, ret[i], 0, fullPayload.length - start);
 			}
 			else {
-				ret[i] = new byte[CHUNK_SIZE];
-				System.arraycopy(fullPayload, start, ret[i], 0, CHUNK_SIZE);
+				ret[i] = new byte[MAX_SEGMENT_SIZE];
+				System.arraycopy(fullPayload, start, ret[i], 0, MAX_SEGMENT_SIZE);
 			}
-			start += CHUNK_SIZE;
+			start += MAX_SEGMENT_SIZE;
 		}
 		return ret;
 	}
@@ -264,7 +265,6 @@ public class FastFtp {
 	  * @param chunk 	Chunk to be added to the queue
 	  * @param serverName	Address of the server
 	  * @param sPort 	UDP port of the server
-	  * @return boolean	Returns true if the segment was able to be added to the queue, false if the queue is full
 	**/
 	public synchronized void addToQueue(byte[] chunk, String serverName, Integer sPort)
 	{
