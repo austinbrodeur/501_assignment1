@@ -8,9 +8,7 @@
 
 import java.net.*;
 import java.util.*;
-import java.io.*;
 import java.nio.file.*;
-import java.util.regex.Pattern;
 import cpsc441.a3.shared.*;
 
 public class FastFtp {
