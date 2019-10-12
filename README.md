@@ -1,1 +1,1 @@
-### Source code files and more detailed READMA in src directory.
+### Source code files and more detailed README in src directory.
