@@ -18,8 +18,7 @@ public class FastFtp {
 	private final int MAX_SEGMENT_SIZE = 1000;
 	private final int THREAD_KILL_DELAY = 500;
 
-	private Socket tcpConnection;
-	private DatagramSocket udpSocket;
+	private ServerConnection serverConnection;
 	private ReceiverThread receiverThread;
 	private Thread timeoutManager;
 	private Integer windowSize;
@@ -44,41 +43,6 @@ public class FastFtp {
 
 
 	/**
-	 * Attempts to get the UDP port from the server. Will quit after 10 tries.
-	 *
-	 * @param serverName	Server address or name
-	 * @param serverTCPPort	Server TCP port for handshake
-	 * @param fileName		Path of file to be transferred
-	 * @return				UDP port of the server retrieved by the handshake
-	 */
-	public int getServerUDP(String serverName, Integer serverTCPPort, String fileName) {
-		Integer serverUDPPort = -1;
-		Integer retry_count = 1;
-		while (serverUDPPort == -1) {
-			try {
-				System.out.println("Trying to obtain UDP port from server... Attempt " + retry_count);
-
-				createSendUdp();
-
-				serverUDPPort = openTCP(serverName, serverTCPPort, fileName);
-				if (serverUDPPort == -1) {
-					throw new Exception("UDP port could not be received from the server");
-				}
-				System.out.println("Server UDP port received: " + serverUDPPort);
-			} catch (Exception e) {
-				System.out.println("Error getting UDP port from server: ");
-				e.printStackTrace();
-			}
-			if (retry_count == 10) {
-				throw new RuntimeException();
-			}
-			retry_count += 1;
-		}
-		return serverUDPPort;
-	}
-
-
-	/**
 	 * Initializes the threads required for the send method
 	 *
 	 * @param serverName	Server address or name
@@ -86,16 +50,16 @@ public class FastFtp {
 	 * @param fileChunks	2D byte array of file after being divided into chunks
 	 */
 	public void initializeThreads(String serverName, Integer serverUDPPort, byte[][] fileChunks) {
-		timeoutManager = new Thread(new TimeoutManager(transmitQueue, udpSocket, serverName, serverUDPPort, timeoutTime, timer, retransmitCount));
+		timeoutManager = new Thread(new TimeoutManager(transmitQueue, serverConnection.getUdpSocket(), serverName, serverUDPPort, timeoutTime, timer, retransmitCount));
 		timeoutManager.start();
 
-		receiverThread = new ReceiverThread(udpSocket, transmitQueue, fileChunks.length, serverName, serverUDPPort);
+		receiverThread = new ReceiverThread(serverConnection.getUdpSocket(), transmitQueue, fileChunks.length, serverName, serverUDPPort);
 		receiverThread.start();
 	}
 
 
 	/**
-	 * Cleans up threads and generates report after file is transferred
+	 * Reports success, cleans up threads and generates report after file is transferred. Is the teardown for the send method.
 	 */
 	public void teardownSend() {
 		try {
@@ -105,7 +69,7 @@ public class FastFtp {
 			Thread.sleep(THREAD_KILL_DELAY);
 			timer.cancel();
 			timeoutManager.interrupt();
-			tcpConnection.close();
+			serverConnection.closeTcpConnection();
 		}
 		catch (Exception e) {
 			System.out.println("Error tearing down: ");
@@ -127,7 +91,6 @@ public class FastFtp {
      * @param fileName		Name of the file to be trasferred to the remote server
      */
 	public void send(String serverName, Integer serverPort, String fileName) {
-		Integer serverUdpPort;
 		byte[][] fileChunks;
 		retransmitCount[0] = 0;
 
@@ -135,8 +98,9 @@ public class FastFtp {
 			fileChunks = splitFile(filetoBytes(fileName));
 			System.out.println("Number of chunks: " + fileChunks.length);
 
-			createSendUdp();
-			serverUdpPort = getServerUDP(serverName, serverPort, fileName);
+			serverConnection = new ServerConnection(serverName, serverPort, fileName);
+			Integer serverUdpPort = serverConnection.getServerUdpPort();
+
 			initializeThreads(serverName, serverUdpPort, fileChunks);
 
 			for (byte[] fileChunk : fileChunks) {
@@ -153,61 +117,6 @@ public class FastFtp {
 		catch (Exception e) {
 			System.out.println("Error in send method: " + e);
 			System.exit(1);
-		}
-	}
-
-
-	/**
-	  * Opens TCP connection with the server and does the initial handshake. Returns UDP port.
-	  *
-	  * @param sname 	Server name
-	  * @param port 	Port for the server
-	  * @param fname 	Name of file to be sent
-	  * @return Integer Port for the UDP connection of the server. If this is -1 after the method is finished running, there was an error.
-	**/
-	public Integer openTCP(String sname, Integer port, String fname)
-	{
-		DataInputStream dataIn = null;
-		DataOutputStream dataOut = null;
-		File file;
-		Integer udpPort = -1;
-
-		try {
-			tcpConnection = new Socket(sname, port);
-
-			dataIn = new DataInputStream(tcpConnection.getInputStream());
-			dataOut = new DataOutputStream(tcpConnection.getOutputStream());
-		}
-		catch (IOException e) {
-			System.out.println("Error creating initial TCP connection: " + e);
-		}
-
-		try {
-			file = new File(fname);
-
-			dataOut.writeUTF(fname);
-			dataOut.writeLong(file.length());
-			dataOut.writeInt(udpSocket.getLocalPort()); //Port for the UDP connection of the client
-			dataOut.flush();
-			udpPort = dataIn.readInt();
-		}
-		catch (Exception e) {
-			System.out.println("Error in TCP handshake: " + e);
-		}
-		return udpPort;
-	}
-
-
-	/**
-	  * Opens UDP connection with the server
-	**/
-	public void createSendUdp()
-	{
-		try {
-			udpSocket = new DatagramSocket();
-		}
-		catch(IOException e) {
-			System.out.println("Error opening DatagramSocket: " + e);
 		}
 	}
 
@@ -267,6 +176,7 @@ public class FastFtp {
 	**/
 	public synchronized void addToQueue(byte[] chunk, String serverName, Integer sPort)
 	{
+		DatagramSocket udpSocket = serverConnection.getUdpSocket();
 		try {
 			Segment segmentSend = new Segment(nextSequence, chunk);
 			DatagramPacket sendPacket = new DatagramPacket(segmentSend.getBytes(), segmentSend.getBytes().length, InetAddress.getByName(serverName), sPort);
@@ -295,7 +205,7 @@ public class FastFtp {
 				if (!temp.equals(transmitQueue.toArray())) {
 					timer.cancel();
 					timer = new Timer(true);
-					timer.schedule(new TimeoutHandler(transmitQueue, udpSocket, serverName, udpPort, retransmitCount), timeoutTime);
+					timer.schedule(new TimeoutHandler(transmitQueue, serverConnection.getUdpSocket(), serverName, udpPort, retransmitCount), timeoutTime);
 				}
 			}
 			catch (InterruptedException e) {
